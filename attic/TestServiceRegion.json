@@ -1,0 +1,32 @@
+{
+    "additionParents": {
+        "references": []
+    },
+    "assetParents": {
+        "references": []
+    },
+    "c8y_IsDeviceGroup": {},
+    "c8y_Notes": "",
+    "childAdditions": {
+        "references": [],
+        "self": "https://t8800.iot-dev.enercon.de/inventory/managedObjects/70284407633/childAdditions"
+    },
+    "childAssets": {
+        "references": [],
+        "self": "https://t8800.iot-dev.enercon.de/inventory/managedObjects/70284407633/childAssets"
+    },
+    "childDevices": {
+        "references": [],
+        "self": "https://t8800.iot-dev.enercon.de/inventory/managedObjects/70284407633/childDevices"
+    },
+    "creationTime": "2024-01-23T10:47:16.503Z",
+    "deviceParents": {
+        "references": []
+    },
+    "id": "70284407633",
+    "lastUpdated": "2024-01-23T10:47:43.568Z",
+    "name": "TestServiceRegion",
+    "owner": "christian.guether@softwareag.com",
+    "self": "https://t8800.iot-dev.enercon.de/inventory/managedObjects/70284407633",
+    "type": "c8y_DeviceGroup"
+}

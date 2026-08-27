@@ -1,0 +1,7 @@
+@if (nav.currentObject(); as obj) {
+  <c8y-editor class="json-editor" [editorOptions]="editorOptions" (editorInit)="onEditorInit($event)"></c8y-editor>
+} @else if (nav.loading()) {
+  <p class="hint">Loading…</p>
+} @else {
+  <p class="hint">Select a device or group to view its JSON.</p>
+}

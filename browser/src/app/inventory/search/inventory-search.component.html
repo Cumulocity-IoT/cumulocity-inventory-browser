@@ -1,0 +1,37 @@
+<div class="inventory-search">
+  <div class="search-row">
+    <input
+      type="text"
+      class="search-input"
+      placeholder="Search devices by name, id, or type …"
+      [(ngModel)]="searchTerm"
+      (ngModelChange)="onSearchInput()"
+    />
+    <input
+      type="text"
+      class="search-input"
+      placeholder="Has fragment (e.g. ec_Geo, c8y_Position) …"
+      [(ngModel)]="fragmentTerm"
+      (ngModelChange)="onFragmentInput()"
+    />
+  </div>
+
+  @if (anySearchActive) {
+    <c8y-list-group class="search-results">
+      @for (row of mergedResults; track row.object.id) {
+        <c8y-li [selectable]="true" (click)="select(row.object.id)">
+          <c8y-li-icon [icon]="$any(resultIcon(row))"></c8y-li-icon>
+          {{ row.object.name || row.object.id }}
+          <span class="match-badges">
+            @for (reason of row.matchReasons; track reason) {
+              <span class="match-badge">{{ reason }}</span>
+            }
+          </span>
+        </c8y-li>
+      }
+      @if (!anySearchInFlight && !mergedResults.length) {
+        <p class="empty">No results</p>
+      }
+    </c8y-list-group>
+  }
+</div>

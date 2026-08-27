@@ -1,0 +1,121 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "packageManager": "npm"
+  },
+  "newProjectRoot": "projects",
+  "projects": {
+    "cumulocity-inventory-browser": {
+      "projectType": "application",
+      "schematics": {
+        "@schematics/angular:component": {
+          "style": "scss"
+        }
+      },
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@c8y/devkit:build",
+          "options": {
+            "tsConfig": "tsconfig.app.json",
+            "inlineStyleLanguage": "scss",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
+            "styles": ["@c8y/style/main.scss", "src/styles.scss"],
+            "aot": false,
+            "main": "src/main.ts",
+            "buildOptimizer": false,
+            "outputPath": "dist/cumulocity-inventory-browser",
+            "resourcesOutputPath": "resources",
+            "allowedCommonJsDependencies": [
+              "regenerator-runtime/runtime",
+              "@cordobo/qrcode",
+              "zone.js/dist/zone",
+              "chroma-js"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all",
+              "buildOptimizer": false
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@c8y/devkit:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "cumulocity-inventory-browser:build:production"
+            },
+            "development": {
+              "buildTarget": "cumulocity-inventory-browser:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "buildTarget": "cumulocity-inventory-browser:build-test",
+            "tsConfig": "tsconfig.spec.json",
+            "runner": "vitest",
+            "runnerConfig": "vitest-config.ts"
+          }
+        },
+        "deploy": {
+          "builder": "@c8y/devkit:deploy",
+          "configurations": {
+            "production": {
+              "buildTarget": "cumulocity-inventory-browser:build:production"
+            },
+            "development": {
+              "buildTarget": "cumulocity-inventory-browser:build:development"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "extract-i18n": {
+          "builder": "@c8y/devkit:extract-i18n"
+        },
+        "compile-i18n": {
+          "builder": "@c8y/devkit:compile-i18n"
+        },
+        "build-test": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "tsConfig": "tsconfig.spec.json",
+            "polyfills": ["zone.js"],
+            "styles": [],
+            "aot": false
+          }
+        }
+      }
+    }
+  }
+}

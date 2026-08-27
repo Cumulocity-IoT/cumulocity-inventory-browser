@@ -1,0 +1,55 @@
+:host {
+  display: block;
+}
+
+.inventory-search {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.search-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.search-input {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.search-results {
+  display: block;
+  margin-top: 0.5rem;
+  max-height: 14rem;
+  overflow: auto;
+}
+
+c8y-li {
+  cursor: pointer;
+}
+
+.match-badges {
+  margin-left: auto;
+  display: flex;
+  gap: 0.3rem;
+}
+
+.match-badge {
+  font-size: 11px;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: #eef1f3;
+  color: #555;
+  white-space: nowrap;
+}
+
+.empty {
+  color: #999;
+  font-size: 12px;
+  padding: 0.4rem 0;
+  margin: 0;
+}

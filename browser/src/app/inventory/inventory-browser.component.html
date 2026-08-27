@@ -1,0 +1,53 @@
+<c8y-title>{{ pageTitle }}</c8y-title>
+<c8y-action-bar-item placement="left" [priority]="40">
+  <button type="button" class="btn btn-link" [disabled]="!nav.canGoBack()" (click)="nav.back()">
+    <i c8yIcon="arrow-left"></i> Back
+  </button>
+</c8y-action-bar-item>
+<c8y-action-bar-item placement="left" [priority]="30">
+  <button type="button" class="btn btn-link" [disabled]="!nav.canGoParent()" (click)="nav.parent()">
+    <i c8yIcon="arrow-up"></i> Up
+  </button>
+</c8y-action-bar-item>
+<c8y-action-bar-item placement="left" [priority]="20">
+  <button type="button" class="btn btn-link" [disabled]="!nav.canGoPrev()" (click)="nav.prev()">
+    <i c8yIcon="chevron-left"></i> Prev
+  </button>
+</c8y-action-bar-item>
+<c8y-action-bar-item placement="left" [priority]="10">
+  <button type="button" class="btn btn-link" [disabled]="!nav.canGoNext()" (click)="nav.next()">
+    Next <i c8yIcon="chevron-right"></i>
+  </button>
+</c8y-action-bar-item>
+<c8y-action-bar-item placement="right" [priority]="20">
+  <label class="c8y-switch c8y-switch--inline filter-toggle">
+    <input
+      type="checkbox"
+      [checked]="nav.onlyDevicesAndGroups()"
+      (change)="nav.setOnlyDevicesAndGroups($any($event.target).checked)"
+    />
+    <span></span>
+    Only devices &amp; groups
+  </label>
+</c8y-action-bar-item>
+<c8y-action-bar-item placement="right" [priority]="10">
+  <button type="button" class="btn btn-link" title="Refresh" (click)="nav.refresh()">
+    <i c8yIcon="refresh"></i> Refresh
+  </button>
+</c8y-action-bar-item>
+
+<div class="inventory-browser">
+  <app-inventory-search></app-inventory-search>
+  <div class="resizable-region" #resizableRegion>
+    <app-managed-object-view [style.height.px]="topHeightPx"></app-managed-object-view>
+    <div
+      class="divider"
+      [class.dragging]="resizing"
+      (mousedown)="onDividerMouseDown($event)"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize JSON view / Identities"
+    ></div>
+    <app-identities></app-identities>
+  </div>
+</div>

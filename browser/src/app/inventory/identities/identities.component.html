@@ -1,0 +1,23 @@
+<div class="identities">
+  <h3>Identities</h3>
+  @if (nav.identities().length) {
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>External ID</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entry of nav.identities(); track entry.type + entry.externalId) {
+          <tr>
+            <td>{{ entry.type }}</td>
+            <td>{{ entry.externalId }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  } @else {
+    <p class="hint">No identities</p>
+  }
+</div>

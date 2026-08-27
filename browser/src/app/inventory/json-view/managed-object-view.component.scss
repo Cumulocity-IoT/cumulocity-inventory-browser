@@ -1,0 +1,27 @@
+:host {
+  display: block;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.json-editor {
+  display: block;
+  height: 100%;
+}
+
+.hint {
+  display: block;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 1rem;
+  color: #777;
+}
+
+::ng-deep .json-ref-link-decoration {
+  color: var(--c8y-color-primary, #1776bf);
+  text-decoration: underline;
+}
+
+::ng-deep .monaco-editor.json-ref-link-hover .view-lines {
+  cursor: pointer;
+}

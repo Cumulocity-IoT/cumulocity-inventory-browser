@@ -1,0 +1,24 @@
+<div class="tree-node">
+  <span class="tree-toggle" (click)="toggle($event)">{{ expanded ? '▾' : '▸' }}</span>
+  <button type="button" class="tree-link" (click)="select()">
+    <i class="tree-icon" [c8yIcon]="$any(icon)"></i>
+    {{ node.name || node.id }}
+  </button>
+</div>
+@if (expanded) {
+  <ul class="tree-children">
+    @if (loading) {
+      <li class="empty">Loading…</li>
+    } @else if (!children.length) {
+      <li class="empty">No children</li>
+    } @else if (!visibleChildren.length) {
+      <li class="empty">No devices or groups</li>
+    } @else {
+      @for (child of visibleChildren; track child.id) {
+        <li>
+          <app-inventory-tree-node [node]="child" [onlyDevicesAndGroups]="onlyDevicesAndGroups"></app-inventory-tree-node>
+        </li>
+      }
+    }
+  </ul>
+}
