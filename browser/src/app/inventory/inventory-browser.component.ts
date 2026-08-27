@@ -5,11 +5,16 @@ import { ManagedObjectViewComponent } from './json-view/managed-object-view.comp
 import { InventorySearchComponent } from './search/inventory-search.component';
 import { InventoryNavigationService } from './state/inventory-navigation.service';
 
-const STORAGE_KEY = 'inventory-browser.json-view-height-px';
+const SEARCH_STORAGE_KEY = 'inventory-browser.search-results-height-px';
+const TOP_STORAGE_KEY = 'inventory-browser.json-view-height-px';
+const DEFAULT_SEARCH_HEIGHT_PX = 160;
+const MIN_SEARCH_HEIGHT_PX = 90;
 const DEFAULT_TOP_HEIGHT_PX = 480;
 const MIN_TOP_HEIGHT_PX = 200;
 const MIN_BOTTOM_HEIGHT_PX = 120;
 const DIVIDER_HEIGHT_PX = 9;
+
+type ResizeTarget = 'search' | 'json';
 
 @Component({
   selector: 'app-inventory-browser',
@@ -30,10 +35,12 @@ export class InventoryBrowserComponent implements OnDestroy {
 
   @ViewChild('resizableRegion') private resizableRegion?: ElementRef<HTMLDivElement>;
 
-  protected topHeightPx = readStoredHeight();
-  protected resizing = false;
+  protected searchHeightPx = readStoredHeight(SEARCH_STORAGE_KEY, DEFAULT_SEARCH_HEIGHT_PX, MIN_SEARCH_HEIGHT_PX);
+  protected topHeightPx = readStoredHeight(TOP_STORAGE_KEY, DEFAULT_TOP_HEIGHT_PX, MIN_TOP_HEIGHT_PX);
+  protected resizing: ResizeTarget | null = null;
   private startY = 0;
-  private startHeight = 0;
+  private startSearchHeight = 0;
+  private startTopHeight = 0;
   private readonly onMouseMove = (event: MouseEvent): void => this.handleMouseMove(event);
   private readonly onMouseUp = (): void => this.handleMouseUp();
 
@@ -46,11 +53,12 @@ export class InventoryBrowserComponent implements OnDestroy {
     return `Inventory View — ${name}`;
   }
 
-  onDividerMouseDown(event: MouseEvent): void {
+  onDividerMouseDown(event: MouseEvent, target: ResizeTarget): void {
     event.preventDefault();
-    this.resizing = true;
+    this.resizing = target;
     this.startY = event.clientY;
-    this.startHeight = this.topHeightPx;
+    this.startSearchHeight = this.searchHeightPx;
+    this.startTopHeight = this.topHeightPx;
     document.addEventListener('mousemove', this.onMouseMove);
     document.addEventListener('mouseup', this.onMouseUp);
   }
@@ -65,36 +73,51 @@ export class InventoryBrowserComponent implements OnDestroy {
       return;
     }
     const delta = event.clientY - this.startY;
-    let next = Math.max(MIN_TOP_HEIGHT_PX, this.startHeight + delta);
-
     const regionHeight = this.resizableRegion?.nativeElement.getBoundingClientRect().height;
-    if (regionHeight) {
-      const maxTop = Math.max(MIN_TOP_HEIGHT_PX, regionHeight - DIVIDER_HEIGHT_PX - MIN_BOTTOM_HEIGHT_PX);
-      next = Math.min(next, maxTop);
+    const dividersHeight = DIVIDER_HEIGHT_PX * 2;
+
+    if (this.resizing === 'search') {
+      let next = Math.max(MIN_SEARCH_HEIGHT_PX, this.startSearchHeight + delta);
+      if (regionHeight) {
+        const max = Math.max(MIN_SEARCH_HEIGHT_PX, regionHeight - dividersHeight - this.topHeightPx - MIN_BOTTOM_HEIGHT_PX);
+        next = Math.min(next, max);
+      }
+      this.searchHeightPx = next;
+    } else {
+      let next = Math.max(MIN_TOP_HEIGHT_PX, this.startTopHeight + delta);
+      if (regionHeight) {
+        const max = Math.max(MIN_TOP_HEIGHT_PX, regionHeight - dividersHeight - this.searchHeightPx - MIN_BOTTOM_HEIGHT_PX);
+        next = Math.min(next, max);
+      }
+      this.topHeightPx = next;
     }
-    this.topHeightPx = next;
   }
 
   private handleMouseUp(): void {
     if (!this.resizing) {
       return;
     }
-    this.resizing = false;
+    const resized = this.resizing;
+    this.resizing = null;
     document.removeEventListener('mousemove', this.onMouseMove);
     document.removeEventListener('mouseup', this.onMouseUp);
     try {
-      localStorage.setItem(STORAGE_KEY, String(this.topHeightPx));
+      if (resized === 'search') {
+        localStorage.setItem(SEARCH_STORAGE_KEY, String(this.searchHeightPx));
+      } else {
+        localStorage.setItem(TOP_STORAGE_KEY, String(this.topHeightPx));
+      }
     } catch {
       // Private browsing / storage disabled — the resized height just won't persist.
     }
   }
 }
 
-function readStoredHeight(): number {
+function readStoredHeight(key: string, fallback: number, min: number): number {
   try {
-    const stored = Number(localStorage.getItem(STORAGE_KEY));
-    return Number.isFinite(stored) && stored >= MIN_TOP_HEIGHT_PX ? stored : DEFAULT_TOP_HEIGHT_PX;
+    const stored = Number(localStorage.getItem(key));
+    return Number.isFinite(stored) && stored >= min ? stored : fallback;
   } catch {
-    return DEFAULT_TOP_HEIGHT_PX;
+    return fallback;
   }
 }

@@ -1,4 +1,4 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, Input, effect, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IManagedObject } from '@c8y/client';
 import { ListGroupComponent, ListItemComponent, ListItemIconComponent } from '@c8y/ngx-components';
@@ -16,6 +16,10 @@ import { SearchResultRow, mergeSearchResults } from './merge-search-results.util
 })
 export class InventorySearchComponent {
   protected readonly nav = inject(InventoryNavigationService);
+
+  /** Total height of this component (search fields + results list), set by InventoryBrowserComponent's divider. Null = auto height (e.g. in tests). */
+  @Input() heightPx: number | null = null;
+
   private searchDebounce?: ReturnType<typeof setTimeout>;
   private fragmentDebounce?: ReturnType<typeof setTimeout>;
   private firstRefreshSignal = true;

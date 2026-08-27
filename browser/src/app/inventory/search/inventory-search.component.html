@@ -1,4 +1,4 @@
-<div class="inventory-search">
+<div class="inventory-search" [style.height.px]="heightPx">
   <div class="search-row">
     <input
       type="text"
@@ -19,14 +19,16 @@
   @if (anySearchActive) {
     <c8y-list-group class="search-results">
       @for (row of mergedResults; track row.object.id) {
-        <c8y-li [selectable]="true" (click)="select(row.object.id)">
+        <c8y-li [selectable]="true" [dense]="true" (click)="select(row.object.id)">
           <c8y-li-icon [icon]="$any(resultIcon(row))"></c8y-li-icon>
-          {{ row.object.name || row.object.id }}
-          <span class="match-badges">
-            @for (reason of row.matchReasons; track reason) {
-              <span class="match-badge">{{ reason }}</span>
-            }
-          </span>
+          <div class="result-row">
+            <span class="result-name">{{ row.object.name || row.object.id }}</span>
+            <span class="match-badges">
+              @for (reason of row.matchReasons; track reason) {
+                <span class="match-badge">{{ reason }}</span>
+              }
+            </span>
+          </div>
         </c8y-li>
       }
       @if (!anySearchInFlight && !mergedResults.length) {

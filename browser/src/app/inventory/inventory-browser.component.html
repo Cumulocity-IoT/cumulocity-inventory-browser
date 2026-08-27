@@ -37,13 +37,21 @@
 </c8y-action-bar-item>
 
 <div class="inventory-browser">
-  <app-inventory-search></app-inventory-search>
   <div class="resizable-region" #resizableRegion>
+    <app-inventory-search [heightPx]="searchHeightPx"></app-inventory-search>
+    <div
+      class="divider"
+      [class.dragging]="resizing === 'search'"
+      (mousedown)="onDividerMouseDown($event, 'search')"
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize search results / JSON view"
+    ></div>
     <app-managed-object-view [style.height.px]="topHeightPx"></app-managed-object-view>
     <div
       class="divider"
-      [class.dragging]="resizing"
-      (mousedown)="onDividerMouseDown($event)"
+      [class.dragging]="resizing === 'json'"
+      (mousedown)="onDividerMouseDown($event, 'json')"
       role="separator"
       aria-orientation="horizontal"
       aria-label="Resize JSON view / Identities"

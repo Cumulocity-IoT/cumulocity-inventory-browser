@@ -137,26 +137,39 @@ editor to near-zero height. An explicit `vh` value on this one outer container s
 chain, and *within* it, ordinary flexbox works fine since the container itself now has a definite
 height to distribute.
 
-Inside that container: `InventorySearchComponent` takes its natural height
-(`flex: 0 0 auto`), and the remaining space (`flex: 1 1 auto; min-height: 0`) is a
-`.resizable-region` holding the JSON view, a **draggable horizontal divider**, and Identities.
+Inside that container, `.resizable-region` (`flex: 1 1 auto; min-height: 0`) holds all three
+panels — search results, JSON view, Identities — separated by **two independent draggable
+horizontal dividers**:
 
-- The JSON view's height is an explicit `topHeightPx` component property (`InventoryBrowserComponent`),
-  bound via `[style.height.px]` directly on `<app-managed-object-view>`'s host — `ManagedObjectViewComponent`'s
+- `InventorySearchComponent` itself is sized by an explicit `searchHeightPx` property
+  (`InventoryBrowserComponent`), bound via `[heightPx]` → `[style.height.px]` on its own root div.
+  *Within* that fixed height, the component's own internal flex column keeps the two search input
+  fields at their natural size (`flex: 0 0 auto`) and lets only the results list
+  (`.search-results`, `flex: 1 1 auto; overflow: auto`) grow/shrink/scroll — so dragging this
+  divider resizes the results list, never hides the input fields (`MIN_SEARCH_HEIGHT_PX` also keeps
+  a floor for exactly that reason).
+- The JSON view's height is an explicit `topHeightPx` component property, bound via
+  `[style.height.px]` directly on `<app-managed-object-view>`'s host — `ManagedObjectViewComponent`'s
   own `:host`/`.json-editor` just fill that with `height: 100%` (inline styles win over the
   component's own stylesheet, so the parent-set height always applies). The empty/loading state
   (`.hint`) does the same, so the layout doesn't jump once an object is selected.
 - Identities is `flex: 1 1 auto; min-height: 0; overflow: auto` — it simply fills whatever's left,
   no explicit height needed.
-- The **divider** (a plain `<div class="divider">`, `cursor: row-resize`, `role="separator"`) drives
-  `topHeightPx` on `mousedown`/`mousemove`/`mouseup` (listeners on `document`, added/removed per
-  drag rather than left permanently attached), clamped to `[MIN_TOP_HEIGHT_PX, region height −
-  divider height − MIN_BOTTOM_HEIGHT_PX]` (the region's actual height is measured via
-  `ElementRef.getBoundingClientRect()` on drag, not assumed). The chosen height persists to
-  `localStorage` (`inventory-browser.json-view-height-px`) on drag end, read back in the
-  constructor as the initial value.
+- Each **divider** (a plain `<div class="divider">`, `cursor: row-resize`, `role="separator"`) drives
+  its own height (`searchHeightPx` or `topHeightPx`) on `mousedown`/`mousemove`/`mouseup` (listeners
+  on `document`, added/removed per drag rather than left permanently attached, tracked by a single
+  `resizing: 'search' | 'json' | null` field so only one divider is ever live at a time), clamped
+  against the *other* panel's current height plus both dividers' heights and `MIN_BOTTOM_HEIGHT_PX`
+  (the region's actual height is measured via `ElementRef.getBoundingClientRect()` on drag, not
+  assumed). Each chosen height persists to its own `localStorage` key
+  (`inventory-browser.search-results-height-px` / `inventory-browser.json-view-height-px`) on drag
+  end, read back as the initial value via a shared `readStoredHeight(key, fallback, min)` helper.
 - No existing Codex component fits this: `c8y-resizable-grid` (`ResizableGridComponent`) is the
   same idea but for a **left/right** split only, not top/bottom, so it wasn't reusable here.
+
+Search result rows are rendered `[dense]="true"` (a built-in `ListItemComponent` input for a
+tighter row style) plus a small host-level padding override in `inventory-search.component.scss`,
+so more results fit in whatever height the divider above leaves for the list.
 
 ## 4. Navigator & routing integration
 

@@ -3,11 +3,15 @@
 }
 
 .inventory-search {
+  display: flex;
+  flex-direction: column;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid #e5e5e5;
+  overflow: hidden;
 }
 
 .search-row {
+  flex: 0 0 auto;
   display: flex;
   gap: 1rem;
 }
@@ -23,17 +27,37 @@
 
 .search-results {
   display: block;
+  flex: 1 1 auto;
+  min-height: 0;
   margin-top: 0.5rem;
-  max-height: 14rem;
   overflow: auto;
 }
 
 c8y-li {
   cursor: pointer;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  min-height: 0;
+}
+
+.result-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+.result-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .match-badges {
-  margin-left: auto;
+  flex: 0 0 auto;
   display: flex;
   gap: 0.3rem;
 }
