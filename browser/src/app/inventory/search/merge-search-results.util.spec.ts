@@ -6,22 +6,32 @@ function mo(id: string) {
 }
 
 describe('mergeSearchResults', () => {
-  it('tags name/id/type-only results', () => {
-    expect(mergeSearchResults([mo('1')], [])).toEqual([{ object: mo('1'), matchReasons: ['name/id/type'] }]);
+  it('tags results by their source', () => {
+    expect(mergeSearchResults([{ reason: 'name/id/type', items: [mo('1')] }])).toEqual([
+      { id: '1', object: mo('1'), matchReasons: ['name/id/type'] },
+    ]);
   });
 
-  it('tags fragment-only results', () => {
-    expect(mergeSearchResults([], [mo('1')])).toEqual([{ object: mo('1'), matchReasons: ['fragment'] }]);
-  });
-
-  it('merges an object found by both searches into one row with both reasons', () => {
-    const result = mergeSearchResults([mo('1')], [mo('1')]);
+  it('merges an object found by multiple sources into one row with all reasons, in source order', () => {
+    const result = mergeSearchResults([
+      { reason: 'name/id/type', items: [mo('1')] },
+      { reason: 'fragment', items: [mo('1')] },
+      { reason: 'external id', items: [mo('1')] },
+    ]);
     expect(result).toHaveLength(1);
-    expect(result[0].matchReasons).toEqual(['name/id/type', 'fragment']);
+    expect(result[0].matchReasons).toEqual(['name/id/type', 'fragment', 'external id']);
   });
 
-  it('keeps distinct objects as separate rows, in name-results-first then fragment-only order', () => {
-    const result = mergeSearchResults([mo('1'), mo('2')], [mo('2'), mo('3')]);
+  it('keeps distinct objects as separate rows, in source-then-item order', () => {
+    const result = mergeSearchResults([
+      { reason: 'name/id/type', items: [mo('1'), mo('2')] },
+      { reason: 'fragment', items: [mo('2'), mo('3')] },
+    ]);
     expect(result.map((r) => r.object.id)).toEqual(['1', '2', '3']);
+  });
+
+  it('handles empty sources', () => {
+    expect(mergeSearchResults([])).toEqual([]);
+    expect(mergeSearchResults([{ reason: 'external id', items: [] }])).toEqual([]);
   });
 });

@@ -1,7 +1,9 @@
 import { Injectable, computed, signal } from '@angular/core';
-import { IManagedObject, IdentityService, InventoryService } from '@c8y/client';
+import { IManagedObject, IResultList, IdentityService, InventoryService } from '@c8y/client';
 import { HistoryEntry, IdentityEntry, ReferenceNode, SiblingContext } from './inventory.model';
+import { isDeviceOrGroup } from '../shared/managed-object-filter.util';
 import { extractReferenceNode } from '../shared/reference-link.util';
+import { sortByName } from '../shared/sort-managed-objects.util';
 
 @Injectable({ providedIn: 'root' })
 export class InventoryNavigationService {
@@ -12,19 +14,31 @@ export class InventoryNavigationService {
   private readonly _loading = signal(false);
   /** Bumped by refresh() — InventoryTreeComponent (mounted separately, in the Navigator) reacts to it. */
   private readonly _refreshRequested = signal(0);
-  /**
-   * Shared with InventoryTreeComponent (Navigator sidebar) and InventorySearchComponent (main
-   * content, above the JSON view) — two separately-mounted components that both need to read/set
-   * the same "only devices & groups" filter state.
-   */
-  private readonly _onlyDevicesAndGroups = signal(true);
 
   readonly currentObject = this._currentObject.asReadonly();
   readonly identities = this._identities.asReadonly();
   readonly siblingContext = this._siblingContext.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly refreshRequested = this._refreshRequested.asReadonly();
-  readonly onlyDevicesAndGroups = this._onlyDevicesAndGroups.asReadonly();
+
+  /**
+   * The currently-open object's id plus every ancestor id up to its root — used by
+   * InventoryTreeComponent/InventoryTreeNodeComponent to auto-expand the Navigator tree down to
+   * whatever's selected. `deviceParents`/`assetParents` on `currentObject` already carry the *full*
+   * ancestor chain (not just the direct parent) once fetched `withParents: true` (§load) — per the
+   * Inventory API docs, "all ancestors from all levels above" — so this is a pure `computed()`, no
+   * extra fetches needed at all (an earlier version of this walked one `detail()` call per
+   * ancestor level; unnecessary once `withParents` is doing that server-side already).
+   */
+  readonly revealIds = computed<ReadonlySet<string>>(() => {
+    const obj = this._currentObject();
+    if (!obj) {
+      return new Set();
+    }
+    const refs = [...(obj.deviceParents?.references ?? []), ...(obj.assetParents?.references ?? [])];
+    const ids = refs.map((ref) => extractReferenceNode(ref)?.id).filter((id): id is string => !!id);
+    return new Set([obj.id, ...ids]);
+  });
 
   readonly canGoBack = computed(() => this._history().length > 0);
   readonly canGoParent = computed(() => this.parentTargetId() !== null);
@@ -54,10 +68,6 @@ export class InventoryNavigationService {
   refresh(): void {
     this.reset();
     this._refreshRequested.update((v) => v + 1);
-  }
-
-  setOnlyDevicesAndGroups(value: boolean): void {
-    this._onlyDevicesAndGroups.set(value);
   }
 
   async open(id: string, siblingContext?: SiblingContext): Promise<void> {
@@ -111,19 +121,22 @@ export class InventoryNavigationService {
    */
   private static readonly LIST_FILTER = { withChildren: false, withParents: true };
 
-  async search(text: string): Promise<IManagedObject[]> {
+  /**
+   * Returns the full `IResultList` (not just `.data`) so callers can page further via
+   * `result.paging.next()` — used to drive InventorySearchComponent's "Load more" button.
+   */
+  async search(text: string): Promise<IResultList<IManagedObject> | null> {
     const term = text.trim();
     if (!term) {
-      return [];
+      return null;
     }
     // Query-language `name eq '*term*' or id eq 'term' or type eq '*term*'` (wildcards supported
     // per the Inventory API's query language docs) restricts matching to the name/id/type fields
     // only, instead of `text`'s full-text search across the whole managed object.
-    const { data } = await this.inventory.listQuery(
+    return this.inventory.listQuery(
       { __or: [{ name: `*${term}*` }, { id: term }, { type: `*${term}*` }] },
-      { pageSize: 20, ...InventoryNavigationService.LIST_FILTER }
+      { pageSize: InventoryNavigationService.SEARCH_PAGE_SIZE, ...InventoryNavigationService.LIST_FILTER }
     );
-    return data;
   }
 
   /**
@@ -132,38 +145,77 @@ export class InventoryNavigationService {
    * OR'd/AND'd into `search()`: existence-of-a-fragment and contains-this-text are different kinds
    * of match, and combining them would either return an unrelated mishmash (OR) or silently make
    * the name/id/type search stricter whenever this field has a value (AND).
+   * Also returns the full `IResultList` for the same "Load more" reason as `search()`.
    */
-  async searchByFragment(fragmentName: string): Promise<IManagedObject[]> {
+  async searchByFragment(fragmentName: string): Promise<IResultList<IManagedObject> | null> {
     const name = fragmentName.trim();
     if (!name) {
+      return null;
+    }
+    return this.inventory.listQuery(
+      { __has: name },
+      { pageSize: InventoryNavigationService.SEARCH_PAGE_SIZE, ...InventoryNavigationService.LIST_FILTER }
+    );
+  }
+
+  private static readonly SEARCH_PAGE_SIZE = 20;
+
+  /**
+   * Exact lookup via the Identity API's `GET /identity/externalIds/{type}/{externalId}`
+   * (`IdentityService.detail`) — unlike `search()`/`searchByFragment()`, external IDs aren't a
+   * free-text/wildcard match: the API is keyed by the exact (type, externalId) pair, so both are
+   * required and there's at most one result. That response only carries the matched
+   * `managedObject`'s `id`/`self` (no `name`), so a second, lightweight `detail()` fetch resolves
+   * the name for display — only ever one extra request, since there's at most one hit.
+   */
+  async findByExternalId(type: string, externalId: string): Promise<IManagedObject[]> {
+    if (!type.trim() || !externalId.trim()) {
       return [];
     }
-    const { data } = await this.inventory.listQuery(
-      { __has: name },
-      { pageSize: 20, ...InventoryNavigationService.LIST_FILTER }
-    );
-    return data;
+    try {
+      const { data } = await this.identity.detail({ type: type.trim(), externalId: externalId.trim() });
+      const id = data.managedObject?.id;
+      if (!id) {
+        return [];
+      }
+      const { data: managedObject } = await this.inventory.detail(id, { withChildren: false });
+      return [managedObject];
+    } catch {
+      return [];
+    }
   }
 
   /**
-   * Top-level tree entries: tenant-wide groups AND devices (not just groups) — otherwise a
-   * standalone device with no group parent would never be reachable by browsing the tree at all,
-   * only via search.
+   * Top-level tree entries: only *root* device groups (`fragmentType: c8y_IsDeviceGroup`,
+   * `onlyRoots: true` — the Inventory API's own way of excluding groups that have a parent, per
+   * https://cumulocity.com/api/core/#operation/getManagedObjectCollectionResource) — matches how
+   * Device Management's own Groups navigator scopes its root list (mirrored from
+   * `@c8y/ngx-components/assets-navigator`'s `AssetNodeService`, which isn't a dependency here).
+   * That same navigator also caps the page at a fixed size and appends a "Load more" affordance
+   * instead of fetching every group tenant-wide in one request — `PAGE_SIZE = 20` there, matched
+   * here — so InventoryTreeComponent holds onto the returned `IResultList` to page further via
+   * `.paging.next()`, the same "Load more" pattern already used for search.
    */
-  async rootNodes(): Promise<IManagedObject[]> {
-    const [groups, devices] = await Promise.all([
-      this.inventory.list({ fragmentType: 'c8y_IsDeviceGroup', pageSize: 100, ...InventoryNavigationService.LIST_FILTER }),
-      this.inventory.list({ fragmentType: 'c8y_IsDevice', pageSize: 100, ...InventoryNavigationService.LIST_FILTER }),
-    ]);
-    return [...groups.data, ...devices.data];
+  async rootGroups(): Promise<IResultList<IManagedObject>> {
+    return this.inventory.list({
+      fragmentType: 'c8y_IsDeviceGroup',
+      onlyRoots: true,
+      pageSize: InventoryNavigationService.ROOT_GROUPS_PAGE_SIZE,
+      ...InventoryNavigationService.LIST_FILTER,
+    });
   }
+
+  // TEMP: reduced from 20 to 5 for testing "Load more" — revert before shipping.
+  private static readonly ROOT_GROUPS_PAGE_SIZE = 5;
 
   async childrenOf(id: string): Promise<IManagedObject[]> {
     const [assets, devices] = await Promise.all([
       this.inventory.childAssetsList(id, { pageSize: 100, ...InventoryNavigationService.LIST_FILTER }),
       this.inventory.childDevicesList(id, { pageSize: 100, ...InventoryNavigationService.LIST_FILTER }),
     ]);
-    return [...assets.data, ...devices.data];
+    // childAssets can include plain (non-device, non-group) assets — childDevices is always
+    // devices, but filtering both keeps this in line with search results (§isDeviceOrGroup).
+    return sortByName([...assets.data, ...devices.data].filter(isDeviceOrGroup));
   }
 
   /**
@@ -184,9 +236,15 @@ export class InventoryNavigationService {
 
   private parentReference(): ReferenceNode | null {
     const obj = this._currentObject();
-    if (!obj) {
-      return null;
-    }
+    return obj ? InventoryNavigationService.directParentOf(obj) : null;
+  }
+
+  /**
+   * With `withParents: true` (§load), `references[0]` is assumed to be the *closest* ancestor —
+   * Cumulocity doesn't document the ordering explicitly, but "closest first" is the conventional
+   * shape for this kind of ancestor list, and it's what the Up/Parent button has always assumed.
+   */
+  private static directParentOf(obj: IManagedObject): ReferenceNode | null {
     const deviceParent = obj.deviceParents?.references?.[0];
     const assetParent = obj.assetParents?.references?.[0];
     return extractReferenceNode(deviceParent) ?? extractReferenceNode(assetParent);
@@ -210,7 +268,16 @@ export class InventoryNavigationService {
         // childDevices/childAssets/childAdditions/deviceParents/assetParents arrays off this
         // response — a tenant with the `core.inventory.without.children` toggle enabled would
         // otherwise silently return them empty and break all of that.
-        this.inventory.detail(id, { withChildren: true }),
+        //
+        // withParents: true turned out to be equally required for deviceParents/assetParents to
+        // come back populated at all — the single-object GET does NOT include ancestor references
+        // by default (confirmed against a real tenant: without this flag, a non-root group's own
+        // deviceParents/assetParents both came back as empty arrays even though it clearly has
+        // real parents). This had been silently masked wherever Up/Parent used the sibling-context
+        // `originId` fallback (§parentTargetId) instead — any array-descent navigation always set
+        // that, so the broken deviceParents/assetParents fallback path was rarely exercised. Per
+        // the docs, this returns *all* ancestors, not just the direct parent — see revealIds below.
+        this.inventory.detail(id, { withChildren: true, withParents: true }),
         this.identity.list(id).catch(() => ({ data: [] as IdentityEntry[] })),
       ]);
       this._currentObject.set(detail.data);

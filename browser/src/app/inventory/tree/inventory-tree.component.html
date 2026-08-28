@@ -1,9 +1,14 @@
 <div class="inventory-tree">
   <ul class="tree-root">
-    @for (node of rootNodes; track node.id) {
+    @for (node of rootGroups; track node.id) {
       <li>
-        <app-inventory-tree-node [node]="node" [onlyDevicesAndGroups]="nav.onlyDevicesAndGroups()"></app-inventory-tree-node>
+        <app-inventory-tree-node [node]="node"></app-inventory-tree-node>
       </li>
     }
   </ul>
+  @if (hasMore) {
+    <button type="button" class="load-more" [disabled]="loadingMore" (click)="loadMore()">
+      {{ loadingMore ? 'Loading…' : 'Load more' }}
+    </button>
+  }
 </div>

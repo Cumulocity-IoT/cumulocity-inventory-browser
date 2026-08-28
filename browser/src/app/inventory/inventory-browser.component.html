@@ -19,17 +19,6 @@
     Next <i c8yIcon="chevron-right"></i>
   </button>
 </c8y-action-bar-item>
-<c8y-action-bar-item placement="right" [priority]="20">
-  <label class="c8y-switch c8y-switch--inline filter-toggle">
-    <input
-      type="checkbox"
-      [checked]="nav.onlyDevicesAndGroups()"
-      (change)="nav.setOnlyDevicesAndGroups($any($event.target).checked)"
-    />
-    <span></span>
-    Only devices &amp; groups
-  </label>
-</c8y-action-bar-item>
 <c8y-action-bar-item placement="right" [priority]="10">
   <button type="button" class="btn btn-link" title="Refresh" (click)="nav.refresh()">
     <i c8yIcon="refresh"></i> Refresh

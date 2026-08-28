@@ -22,6 +22,10 @@ function managedObject(id: string, overrides: Record<string, unknown> = {}) {
 class FakeInventoryService {
   objects = new Map<string, ReturnType<typeof managedObject>>();
   lastQuery: unknown;
+  lastListFilter: unknown;
+  listResult: unknown[] = [];
+  childAssets: unknown[] = [];
+  childDevices: unknown[] = [];
 
   async detail(id: string) {
     const data = this.objects.get(id);
@@ -31,8 +35,9 @@ class FakeInventoryService {
     return { data };
   }
 
-  async list() {
-    return { data: [] };
+  async list(filter: unknown) {
+    this.lastListFilter = filter;
+    return { data: this.listResult };
   }
 
   async listQuery(query: unknown) {
@@ -41,22 +46,38 @@ class FakeInventoryService {
   }
 
   async childAssetsList() {
-    return { data: [] };
+    return { data: this.childAssets };
   }
 
   async childDevicesList() {
-    return { data: [] };
+    return { data: this.childDevices };
   }
 }
 
 class FakeIdentityService {
+  externalIdentity: { managedObject?: { id: string } } | null = null;
+  detailError: Error | null = null;
+  lastDetailArgs: unknown;
+
   async list() {
     return { data: [] };
+  }
+
+  async detail(identity: unknown) {
+    this.lastDetailArgs = identity;
+    if (this.detailError) {
+      throw this.detailError;
+    }
+    if (!this.externalIdentity) {
+      throw new Error('404');
+    }
+    return { data: this.externalIdentity };
   }
 }
 
 describe('InventoryNavigationService', () => {
   let inventory: FakeInventoryService;
+  let identity: FakeIdentityService;
   let service: InventoryNavigationService;
 
   beforeEach(() => {
@@ -67,7 +88,8 @@ describe('InventoryNavigationService', () => {
       managedObject('device-1', { deviceParents: { references: [{ self: 'x', managedObject: { id: 'root' } }] } })
     );
     inventory.objects.set('device-2', managedObject('device-2'));
-    service = new InventoryNavigationService(inventory as any, new FakeIdentityService() as any);
+    identity = new FakeIdentityService();
+    service = new InventoryNavigationService(inventory as any, identity as any);
   });
 
   it('has no back/parent/prev/next available before anything is opened', () => {
@@ -163,5 +185,71 @@ describe('InventoryNavigationService', () => {
     inventory.lastQuery = 'untouched';
     await service.searchByFragment('  ');
     expect(inventory.lastQuery).toBe('untouched');
+  });
+
+  it('rootGroups() queries only root device groups (fragmentType + onlyRoots)', async () => {
+    await service.rootGroups();
+    expect(inventory.lastListFilter).toMatchObject({ fragmentType: 'c8y_IsDeviceGroup', onlyRoots: true });
+  });
+
+  it('childrenOf() filters out plain assets and sorts devices/groups by name', async () => {
+    inventory.childAssets = [
+      { id: 'plain', name: 'Not a device or group' },
+      { id: 'zebra-group', name: 'Zebra Group', c8y_IsDeviceGroup: {} },
+    ];
+    inventory.childDevices = [{ id: 'apple-device', name: 'Apple Device', c8y_IsDevice: {} }];
+
+    const children = await service.childrenOf('root');
+
+    expect(children.map((c) => c.id)).toEqual(['apple-device', 'zebra-group']);
+  });
+
+  it('findByExternalId() requires both type and value', async () => {
+    expect(await service.findByExternalId('', 'x')).toEqual([]);
+    expect(await service.findByExternalId('c8y_Serial', '')).toEqual([]);
+    expect(identity.lastDetailArgs).toBeUndefined();
+  });
+
+  it('findByExternalId() looks up the exact (type, externalId) pair and resolves the managed object', async () => {
+    identity.externalIdentity = { managedObject: { id: 'device-1' } };
+
+    const result = await service.findByExternalId('c8y_Serial', '12345');
+
+    expect(identity.lastDetailArgs).toEqual({ type: 'c8y_Serial', externalId: '12345' });
+    expect(result.map((r) => r.id)).toEqual(['device-1']);
+  });
+
+  it('findByExternalId() returns an empty array when there is no match', async () => {
+    identity.externalIdentity = null;
+    expect(await service.findByExternalId('c8y_Serial', 'missing')).toEqual([]);
+  });
+
+  it('revealIds() reflects the full ancestor chain carried on the withParents: true response', async () => {
+    // A real `withParents: true` response embeds every ancestor directly on the object, not just
+    // the immediate parent — revealIds() reads that straight off currentObject(), no extra fetches.
+    inventory.objects.set(
+      'leaf',
+      managedObject('leaf', {
+        deviceParents: {
+          references: [
+            { self: 'x', managedObject: { id: 'device-1' } },
+            { self: 'y', managedObject: { id: 'root' } },
+          ],
+        },
+      })
+    );
+
+    await service.open('leaf');
+
+    expect(service.revealIds()).toEqual(new Set(['leaf', 'device-1', 'root']));
+  });
+
+  it('reset() clears revealIds()', async () => {
+    await service.open('device-1');
+    expect(service.revealIds().size).toBeGreaterThan(0);
+
+    service.reset();
+
+    expect(service.revealIds()).toEqual(new Set());
   });
 });

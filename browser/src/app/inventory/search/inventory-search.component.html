@@ -1,39 +1,98 @@
 <div class="inventory-search" [style.height.px]="heightPx">
-  <div class="search-row">
-    <input
-      type="text"
-      class="search-input"
-      placeholder="Search devices by name, id, or type …"
-      [(ngModel)]="searchTerm"
-      (ngModelChange)="onSearchInput()"
-    />
-    <input
-      type="text"
-      class="search-input"
-      placeholder="Has fragment (e.g. ec_Geo, c8y_Position) …"
-      [(ngModel)]="fragmentTerm"
-      (ngModelChange)="onFragmentInput()"
-    />
+  <div class="search-fieldsets">
+    <fieldset class="search-fieldset">
+      <legend>Match name, id, type, or fragment</legend>
+      <div class="search-fieldset-fields">
+        <c8y-form-group>
+          <label for="search-term">Contains / equals</label>
+          <input
+            id="search-term"
+            type="text"
+            class="form-control search-input"
+            placeholder="e.g. my-device, 12345, c8y_MQTTDevice …"
+            [(ngModel)]="searchTerm"
+            (ngModelChange)="onSearchInput()"
+          />
+        </c8y-form-group>
+        <c8y-form-group>
+          <label for="fragment-term">Has fragment</label>
+          <input
+            id="fragment-term"
+            type="text"
+            class="form-control search-input"
+            placeholder="e.g. ec_Geo, c8y_Position …"
+            [(ngModel)]="fragmentTerm"
+            (ngModelChange)="onFragmentInput()"
+          />
+        </c8y-form-group>
+      </div>
+    </fieldset>
+
+    <fieldset class="search-fieldset">
+      <legend>External ID (exact match, both required)</legend>
+      <div class="search-fieldset-fields">
+        <c8y-form-group>
+          <label for="external-id-type">Type</label>
+          <input
+            id="external-id-type"
+            type="text"
+            class="form-control search-input"
+            placeholder="e.g. c8y_Serial …"
+            [(ngModel)]="externalIdType"
+            (ngModelChange)="onExternalIdInput()"
+          />
+        </c8y-form-group>
+        <c8y-form-group>
+          <label for="external-id-value">External ID</label>
+          <input
+            id="external-id-value"
+            type="text"
+            class="form-control search-input"
+            placeholder="e.g. 12345 …"
+            [(ngModel)]="externalIdValue"
+            (ngModelChange)="onExternalIdInput()"
+          />
+        </c8y-form-group>
+      </div>
+    </fieldset>
   </div>
 
   @if (anySearchActive) {
-    <c8y-list-group class="search-results">
-      @for (row of mergedResults; track row.object.id) {
-        <c8y-li [selectable]="true" [dense]="true" (click)="select(row.object.id)">
-          <c8y-li-icon [icon]="$any(resultIcon(row))"></c8y-li-icon>
-          <div class="result-row">
-            <span class="result-name">{{ row.object.name || row.object.id }}</span>
+    <div class="search-results">
+      <c8y-data-grid
+        class="results-grid"
+        [columns]="columns"
+        [rows]="mergedResults()"
+        [pagination]="gridPagination()"
+        [displayOptions]="displayOptions"
+        [loading]="anySearchInFlight"
+        (rowClick)="onRowClick($any($event))"
+      >
+        <c8y-column name="name">
+          <ng-container *c8yCellRendererDef="let context">
+            <i class="result-icon" [c8yIcon]="$any(cellIcon(context))"></i>
+            <span class="result-name">{{ cellName(context) }}</span>
+          </ng-container>
+        </c8y-column>
+        <c8y-column name="matches">
+          <ng-container *c8yCellRendererDef="let context">
             <span class="match-badges">
-              @for (reason of row.matchReasons; track reason) {
+              @for (reason of context.value; track reason) {
                 <span class="match-badge">{{ reason }}</span>
               }
             </span>
-          </div>
-        </c8y-li>
-      }
-      @if (!anySearchInFlight && !mergedResults.length) {
+          </ng-container>
+        </c8y-column>
+      </c8y-data-grid>
+
+      @if (!anySearchInFlight && !mergedResults().length) {
         <p class="empty">No results</p>
       }
-    </c8y-list-group>
+      @if (hasMore) {
+        <button type="button" class="load-more" [disabled]="loadingMore" (click)="loadMore()">
+          {{ loadingMore ? 'Loading…' : 'Load more' }}
+        </button>
+      }
+    </div>
   }
 </div>

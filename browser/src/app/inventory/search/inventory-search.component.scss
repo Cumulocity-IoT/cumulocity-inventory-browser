@@ -10,55 +10,95 @@
   overflow: hidden;
 }
 
-.search-row {
+.search-fieldsets {
   flex: 0 0 auto;
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.search-fieldset {
+  flex: 1 1 220px;
+  min-width: 200px;
+  margin: 0;
+  padding: 0.3rem 0.6rem 0.4rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.search-fieldset legend {
+  width: auto;
+  margin: 0 0 0.2rem;
+  padding: 0 0.2rem;
+  border: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #888;
+  line-height: 1.2;
+}
+
+.search-fieldset-fields {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.search-fieldset-fields > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.search-fieldset label {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 11px;
+  font-weight: normal;
+  color: #666;
+}
+
+::ng-deep .search-fieldset .form-group {
+  margin-bottom: 0;
 }
 
 .search-input {
-  flex: 1 1 0;
-  min-width: 0;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  width: 100%;
   font-size: 13px;
 }
 
 .search-results {
-  display: block;
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
   margin-top: 0.5rem;
-  overflow: auto;
+  overflow: hidden;
 }
 
-c8y-li {
-  cursor: pointer;
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
+.results-grid {
+  flex: 1 1 auto;
   min-height: 0;
+  overflow: auto;
+  font-size: 13px;
 }
 
-.result-row {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-  gap: 0.5rem;
+.results-grid ::ng-deep .data-grid-container tr {
+  cursor: pointer;
+}
+
+.result-icon {
+  margin-right: 0.4rem;
+  color: #777;
 }
 
 .result-name {
-  flex: 1 1 auto;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .match-badges {
-  flex: 0 0 auto;
-  display: flex;
+  display: inline-flex;
   gap: 0.3rem;
 }
 
@@ -76,4 +116,25 @@ c8y-li {
   font-size: 12px;
   padding: 0.4rem 0;
   margin: 0;
+}
+
+.load-more {
+  flex: 0 0 auto;
+  align-self: center;
+  margin: 0.5rem 0 0.2rem;
+  padding: 0.3rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.load-more:hover {
+  background: #f5f5f5;
+}
+
+.load-more:disabled {
+  cursor: default;
+  opacity: 0.6;
 }

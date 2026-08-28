@@ -18,12 +18,18 @@
   gap: 0.35rem;
   background: none;
   border: none;
-  padding: 0;
-  margin: 0;
+  padding: 0.05rem 0.35rem;
+  margin: 0 0 0 -0.35rem;
+  border-radius: 3px;
   text-align: left;
   cursor: pointer;
   font: inherit;
   color: inherit;
+}
+
+.tree-link.active {
+  background: rgba(255, 255, 255, 0.18);
+  font-weight: 600;
 }
 
 .tree-icon {

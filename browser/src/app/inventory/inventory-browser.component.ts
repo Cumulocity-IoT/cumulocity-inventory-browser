@@ -7,8 +7,8 @@ import { InventoryNavigationService } from './state/inventory-navigation.service
 
 const SEARCH_STORAGE_KEY = 'inventory-browser.search-results-height-px';
 const TOP_STORAGE_KEY = 'inventory-browser.json-view-height-px';
-const DEFAULT_SEARCH_HEIGHT_PX = 160;
-const MIN_SEARCH_HEIGHT_PX = 90;
+const DEFAULT_SEARCH_HEIGHT_PX = 220;
+const MIN_SEARCH_HEIGHT_PX = 140;
 const DEFAULT_TOP_HEIGHT_PX = 480;
 const MIN_TOP_HEIGHT_PX = 200;
 const MIN_BOTTOM_HEIGHT_PX = 120;

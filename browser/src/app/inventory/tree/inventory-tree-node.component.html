@@ -1,6 +1,6 @@
 <div class="tree-node">
   <span class="tree-toggle" (click)="toggle($event)">{{ expanded ? '▾' : '▸' }}</span>
-  <button type="button" class="tree-link" (click)="select()">
+  <button type="button" class="tree-link" [class.active]="isActive" (click)="select()">
     <i class="tree-icon" [c8yIcon]="$any(icon)"></i>
     {{ node.name || node.id }}
   </button>
@@ -11,12 +11,10 @@
       <li class="empty">Loading…</li>
     } @else if (!children.length) {
       <li class="empty">No children</li>
-    } @else if (!visibleChildren.length) {
-      <li class="empty">No devices or groups</li>
     } @else {
-      @for (child of visibleChildren; track child.id) {
+      @for (child of children; track child.id) {
         <li>
-          <app-inventory-tree-node [node]="child" [onlyDevicesAndGroups]="onlyDevicesAndGroups"></app-inventory-tree-node>
+          <app-inventory-tree-node [node]="child"></app-inventory-tree-node>
         </li>
       }
     }
