@@ -51,11 +51,9 @@ export class InventoryTreeComponent implements OnInit {
     });
 
     // Auto-expand to the current selection: page through the root list (the same "Load more" a
-    // user would click) until whichever ancestor id InventoryNavigationService has resolved so far
+    // user would click) until the top-of-chain ancestor id from InventoryNavigationService.revealIds
     // shows up — InventoryTreeNodeComponent handles the rest (expanding down from there) once that
-    // root node exists to attach to. Ids arrive incrementally (see computeRevealIds), so this may
-    // run again as deeper levels resolve, but by then the root is already loaded and this is a
-    // no-op.
+    // root node exists to attach to.
     effect(() => {
       const ids = this.nav.revealIds();
       void this.ensureRevealedRootLoaded(ids);
