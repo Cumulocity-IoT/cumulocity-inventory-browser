@@ -141,7 +141,7 @@ export class InventoryNavigationService {
 
   /**
    * Matches objects that *have* the given top-level fragment defined (`__has`, per the Inventory
-   * API's query language) — e.g. `ec_Geo`, `c8y_Position`. Kept as its own query rather than
+   * API's query language) — e.g. `c8y_Position`, `c8y_Position`. Kept as its own query rather than
    * OR'd/AND'd into `search()`: existence-of-a-fragment and contains-this-text are different kinds
    * of match, and combining them would either return an unrelated mishmash (OR) or silently make
    * the name/id/type search stricter whenever this field has a value (AND).

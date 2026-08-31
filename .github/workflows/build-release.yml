@@ -1,0 +1,74 @@
+# This workflow builds and releases the Cumulocity Inventory Browser plugin
+name: Build Inventory Browser
+
+on:
+  workflow_dispatch:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        working-directory: ./browser
+
+      - name: Set npm version
+        run: npm version ${{ env.VERSION }} --no-git-tag-version --allow-same-version
+        working-directory: ./browser
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./browser
+
+      - name: Run tests
+        run: npm run test --if-present -- --watch=false
+        working-directory: ./browser
+
+      - name: Build
+        run: npm run build --if-present
+        working-directory: ./browser
+
+      - name: Zip Plugin
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cd dist/cumulocity-inventory-browser
+          zip -r -q ../cumulocity-inventory-browser.zip *
+        working-directory: ./browser
+
+      - name: Create Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.ref }}
+          draft: true
+          prerelease: ${{ contains(env.VERSION, '-pre') }}
+          files: |
+            ./browser/dist/cumulocity-inventory-browser.zip

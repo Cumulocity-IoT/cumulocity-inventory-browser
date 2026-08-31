@@ -164,9 +164,9 @@ describe('InventoryNavigationService', () => {
   });
 
   it('search() builds a name/id/type __or query', async () => {
-    await service.search('ec_Geo');
+    await service.search('c8y_Position');
     expect(inventory.lastQuery).toEqual({
-      __or: [{ name: '*ec_Geo*' }, { id: 'ec_Geo' }, { type: '*ec_Geo*' }],
+      __or: [{ name: '*c8y_Position*' }, { id: 'c8y_Position' }, { type: '*c8y_Position*' }],
     });
   });
 
@@ -177,8 +177,8 @@ describe('InventoryNavigationService', () => {
   });
 
   it('searchByFragment() builds a __has query, independent of search()', async () => {
-    await service.searchByFragment('ec_Geo');
-    expect(inventory.lastQuery).toEqual({ __has: 'ec_Geo' });
+    await service.searchByFragment('c8y_Position');
+    expect(inventory.lastQuery).toEqual({ __has: 'c8y_Position' });
   });
 
   it('searchByFragment() short-circuits on blank input without querying', async () => {

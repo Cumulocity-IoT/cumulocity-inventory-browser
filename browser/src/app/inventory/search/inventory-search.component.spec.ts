@@ -37,7 +37,7 @@ describe('InventorySearchComponent — merged results from both fields', () => {
     const component = createComponent();
     component.searchTerm = 'x';
     component.results.set([device]);
-    component.fragmentTerm = 'ec_Geo';
+    component.fragmentTerm = 'c8y_Position';
     component.fragmentResults.set([device, fragmentOnly]);
 
     const rows = component.mergedResults();
@@ -110,7 +110,7 @@ describe('InventorySearchComponent — reacting to a refresh request', () => {
     const component = createComponent();
     component.searchTerm = 'leftover search';
     component.results.set([{ id: 'x' } as any]);
-    component.fragmentTerm = 'ec_Geo';
+    component.fragmentTerm = 'c8y_Position';
     component.fragmentResults.set([{ id: 'y' } as any]);
     component.externalIdType = 'c8y_Serial';
     component.externalIdValue = '12345';
