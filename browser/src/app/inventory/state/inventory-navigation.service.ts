@@ -14,31 +14,21 @@ export class InventoryNavigationService {
   private readonly _loading = signal(false);
   /** Bumped by refresh() — InventoryTreeComponent (mounted separately, in the Navigator) reacts to it. */
   private readonly _refreshRequested = signal(0);
+  /**
+   * The currently-open object's id plus every ancestor id resolved so far, up to its true root —
+   * used by InventoryTreeComponent/InventoryTreeNodeComponent to auto-expand the Navigator tree
+   * down to whatever's selected. Built incrementally by `computeRevealIds` (§load), not a pure
+   * `computed()` off `currentObject` — see that method for why.
+   */
+  private readonly _revealIds = signal<ReadonlySet<string>>(new Set());
+  private revealToken = 0;
 
   readonly currentObject = this._currentObject.asReadonly();
   readonly identities = this._identities.asReadonly();
   readonly siblingContext = this._siblingContext.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly refreshRequested = this._refreshRequested.asReadonly();
-
-  /**
-   * The currently-open object's id plus every ancestor id up to its root — used by
-   * InventoryTreeComponent/InventoryTreeNodeComponent to auto-expand the Navigator tree down to
-   * whatever's selected. `deviceParents`/`assetParents` on `currentObject` already carry the *full*
-   * ancestor chain (not just the direct parent) once fetched `withParents: true` (§load) — per the
-   * Inventory API docs, "all ancestors from all levels above" — so this is a pure `computed()`, no
-   * extra fetches needed at all (an earlier version of this walked one `detail()` call per
-   * ancestor level; unnecessary once `withParents` is doing that server-side already).
-   */
-  readonly revealIds = computed<ReadonlySet<string>>(() => {
-    const obj = this._currentObject();
-    if (!obj) {
-      return new Set();
-    }
-    const refs = [...(obj.deviceParents?.references ?? []), ...(obj.assetParents?.references ?? [])];
-    const ids = refs.map((ref) => extractReferenceNode(ref)?.id).filter((id): id is string => !!id);
-    return new Set([obj.id, ...ids]);
-  });
+  readonly revealIds = this._revealIds.asReadonly();
 
   readonly canGoBack = computed(() => this._history().length > 0);
   readonly canGoParent = computed(() => this.parentTargetId() !== null);
@@ -62,6 +52,8 @@ export class InventoryNavigationService {
     this._identities.set([]);
     this._history.set([]);
     this._siblingContext.set(null);
+    this._revealIds.set(new Set());
+    this.revealToken++; // invalidates any in-flight computeRevealIds() walk
   }
 
   /** "Start new": resets navigation state and signals InventoryTreeComponent to reload/collapse. */
@@ -205,8 +197,7 @@ export class InventoryNavigationService {
     });
   }
 
-  // TEMP: reduced from 20 to 5 for testing "Load more" — revert before shipping.
-  private static readonly ROOT_GROUPS_PAGE_SIZE = 5;
+  private static readonly ROOT_GROUPS_PAGE_SIZE = 20;
 
   async childrenOf(id: string): Promise<IManagedObject[]> {
     const [assets, devices] = await Promise.all([
@@ -240,14 +231,75 @@ export class InventoryNavigationService {
   }
 
   /**
-   * With `withParents: true` (§load), `references[0]` is assumed to be the *closest* ancestor —
-   * Cumulocity doesn't document the ordering explicitly, but "closest first" is the conventional
-   * shape for this kind of ancestor list, and it's what the Up/Parent button has always assumed.
+   * With `withParents: true` (§load), the first entry from `parentsOf` is assumed to be the
+   * *closest* ancestor — Cumulocity doesn't document the ordering explicitly, but "closest first"
+   * is the conventional shape for this kind of ancestor list, and it's what the Up/Parent button
+   * has always assumed.
    */
   private static directParentOf(obj: IManagedObject): ReferenceNode | null {
-    const deviceParent = obj.deviceParents?.references?.[0];
-    const assetParent = obj.assetParents?.references?.[0];
-    return extractReferenceNode(deviceParent) ?? extractReferenceNode(assetParent);
+    return InventoryNavigationService.parentsOf(obj)[0] ?? null;
+  }
+
+  /**
+   * Resolves the full ancestor chain up to the true root — NOT a single `withParents: true`
+   * response. Confirmed against a real tenant: `withParents` does *not* reliably return ancestors
+   * all the way to the root in one shot (contrary to what the docs' "all ancestors from all levels
+   * above" phrasing suggests) — a device's own response listed 3 ancestors, none of which were
+   * themselves the root, and the actual root (found only by manually expanding the tree) was one
+   * level further up. So this treats `withParents` as "however far it got" per hop, and re-queries
+   * (again with `withParents: true`, so each hop can still cover more than one level) from every
+   * new ancestor edge until no hop turns up anything new. Runs in the background (fired from
+   * `load()`, not awaited there) and updates `_revealIds` after each round, so the tree can start
+   * expanding toward whatever's been resolved so far while deeper levels are still being fetched.
+   * `revealToken` guards against a slower, superseded walk (from a since-abandoned navigation)
+   * overwriting the result of a newer one. `MAX_REVEAL_ROUNDS` bounds runaway walks (a malformed or
+   * cyclic parent graph) — each round can itself fan out to several `detail()` calls, so this is a
+   * cap on *rounds*, not total requests.
+   */
+  private async computeRevealIds(startId: string, startObject: IManagedObject): Promise<void> {
+    const token = ++this.revealToken;
+    const ids = new Set<string>([startId]);
+    this._revealIds.set(new Set(ids));
+
+    let frontier = InventoryNavigationService.parentsOf(startObject).filter((ref) => !ids.has(ref.id));
+    let round = 0;
+    while (frontier.length && round++ < InventoryNavigationService.MAX_REVEAL_ROUNDS) {
+      for (const ref of frontier) {
+        ids.add(ref.id);
+      }
+      if (token !== this.revealToken) {
+        return;
+      }
+      this._revealIds.set(new Set(ids));
+
+      const results = await Promise.all(
+        frontier.map((ref) =>
+          this.inventory.detail(ref.id, { withChildren: false, withParents: true }).catch(() => null)
+        )
+      );
+      if (token !== this.revealToken) {
+        return;
+      }
+      const nextFrontier: ReferenceNode[] = [];
+      for (const result of results) {
+        if (!result) {
+          continue;
+        }
+        for (const ref of InventoryNavigationService.parentsOf(result.data)) {
+          if (!ids.has(ref.id)) {
+            nextFrontier.push(ref);
+          }
+        }
+      }
+      frontier = nextFrontier;
+    }
+  }
+
+  private static readonly MAX_REVEAL_ROUNDS = 10;
+
+  private static parentsOf(obj: IManagedObject): ReferenceNode[] {
+    const refs = [...(obj.deviceParents?.references ?? []), ...(obj.assetParents?.references ?? [])];
+    return refs.map((ref) => extractReferenceNode(ref)).filter((ref): ref is ReferenceNode => ref !== null);
   }
 
   private pushHistory(): void {
@@ -276,13 +328,16 @@ export class InventoryNavigationService {
         // real parents). This had been silently masked wherever Up/Parent used the sibling-context
         // `originId` fallback (§parentTargetId) instead — any array-descent navigation always set
         // that, so the broken deviceParents/assetParents fallback path was rarely exercised. Per
-        // the docs, this returns *all* ancestors, not just the direct parent — see revealIds below.
+        // the docs, this returns "all ancestors from all levels above" — in practice (confirmed
+        // against a real tenant) it doesn't reliably reach the true root in one shot, so revealIds
+        // (§computeRevealIds) keeps walking further from whatever this response did return.
         this.inventory.detail(id, { withChildren: true, withParents: true }),
         this.identity.list(id).catch(() => ({ data: [] as IdentityEntry[] })),
       ]);
       this._currentObject.set(detail.data);
       this._identities.set((identities.data ?? []) as IdentityEntry[]);
       this._siblingContext.set(siblingContext);
+      void this.computeRevealIds(id, detail.data);
     } finally {
       this._loading.set(false);
     }

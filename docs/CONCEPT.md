@@ -84,21 +84,29 @@ removed and the filtering is now unconditional.
   (search, a JSON reference link) that isn't currently visible.
 - **Reveal-in-tree**: auto-expands the ancestor chain down to whatever's currently selected, so a
   search result (or any navigation) doesn't leave the tree looking unrelated to what's open.
-  `InventoryNavigationService.revealIds` is a plain `computed()` off `currentObject`'s own
-  `deviceParents`/`assetParents.references` — **not** an extra fetch or a level-by-level walk. That
-  only works because `load()`'s `detail()` call passes `withParents: true`, which turned out to be
-  required (confirmed against a real tenant) for `deviceParents`/`assetParents` to come back
-  populated *at all* on the single-object GET, not just the list endpoint — an earlier version of
-  this code assumed the direct parent was included by default (matching what the Up/Parent button
-  had always relied on) and was simply wrong: without `withParents`, a non-root object's own
-  ancestor references come back as empty arrays. That bug had been silently masked wherever Up used
-  the sibling-context `originId` fallback instead (§`parentTargetId`) — any array-descent navigation
-  always sets that, so the broken fallback path was rarely exercised — but it meant Up/Parent (and,
-  before this fix, reveal-in-tree) was actually broken for any object reached without sibling
-  context (direct search selection, first navigation into the tree). With `withParents: true`, the
-  response carries *every* ancestor in one shot (per the docs, "all ancestors from all levels
-  above"), so `revealIds()` needs no network calls of its own at all. Two effects consume it, and
-  nothing calls into the other directly — the cascade is entirely reactive:
+  `InventoryNavigationService.computeRevealIds` walks `deviceParents`/`assetParents` — and, despite
+  what the docs' "all ancestors from all levels above" phrasing suggests, `withParents: true`
+  (§load) does **not** reliably return the *complete* chain up to the true root in one response:
+  confirmed against a real tenant, a device's own `withParents: true` response listed 3 ancestors,
+  none of which were themselves the root — the actual root was one level further up, only found by
+  manually expanding the tree. So this treats each response as "however far it got" and re-queries
+  (`detail(ancestorId, { withParents: true })`, so each hop can still cover more than one level, not
+  strictly one level at a time) from every new ancestor edge until a round turns up nothing new,
+  bounded by `MAX_REVEAL_ROUNDS` (10) against a malformed/cyclic parent graph. This same fix also
+  applies to the Up/Parent button's fallback path (§`parentTargetId`) — `withParents` was found to be
+  required there too, since (also confirmed against a real tenant) the single-object GET does *not*
+  include ancestor references by default at all, contrary to what an earlier version of this code
+  assumed; without it, a non-root object's own `deviceParents`/`assetParents` come back as empty
+  arrays even though it clearly has real parents. That bug had been silently masked wherever Up used
+  the sibling-context `originId` fallback instead — any array-descent navigation always sets that, so
+  the broken fallback path was rarely exercised — but it meant Up/Parent (and, before this fix,
+  reveal-in-tree) was actually broken for any object reached without sibling context (direct search
+  selection, first navigation into the tree). `computeRevealIds` runs in the background (fired from
+  `load()`, not awaited there) and publishes the growing id set via `revealIds()` after each round, so
+  the tree can start expanding root while deeper levels are still resolving; `revealToken` guards
+  against a slower, superseded walk (from a since-abandoned navigation) overwriting a newer one's
+  result. Two effects consume `revealIds()`, and nothing calls into the other directly — the cascade
+  is entirely reactive:
   - `InventoryTreeComponent` pages through the root list (the same `loadMore()` a user would click)
     until one of `revealIds()` shows up among `rootGroups`, or there's no more to load.
   - Every `InventoryTreeNodeComponent`, once *its own* `node.id` is in `revealIds()` (and isn't the
@@ -113,10 +121,16 @@ removed and the filtering is now unconditional.
     ever appear in the `onlyRoots`-filtered root list `InventoryTreeComponent` is paging through.
     `hasMore` alone doesn't catch that case — it only reflects whether the *server* has more pages,
     not whether continuing is worth it — so `ensureRevealedRootLoaded` also caps itself at
-    `MAX_REVEAL_LOAD_MORE_ATTEMPTS` (15) "Load more" calls, persistent for the tree's lifetime
-    (reset on Refresh, not per attempt). Without it, a selection whose root ancestor isn't itself a
-    device group pages through the tenant's *entire* root-group list looking for an id that will
-    never show up — observed in practice as 300+ requests in a row.
+    `MAX_REVEAL_LOAD_MORE_ATTEMPTS` (15) "Load more" calls, reset per *distinct* `revealIds()` value
+    (`revealAttemptsKey`, the sorted id set as a string) — i.e. a fresh budget for each new
+    navigation, not once for the tree's whole lifetime. That distinction matters: an earlier version
+    reset the counter only on Refresh, so attempts spent hunting for one (unreachable) selection's
+    root stayed "spent" and silently starved the budget for every later, actually-reachable
+    selection — observed in practice as a real device with a real, findable root group never
+    getting revealed, simply because an earlier navigation in the same session had already used up
+    the attempts. Without the cap at all, a selection whose root ancestor isn't itself a device
+    group pages through the tenant's *entire* root-group list looking for an id that will never show
+    up — observed in practice as 300+ requests in a row.
 
 ### 3.1a Main panel — search (`InventorySearchComponent`)
 

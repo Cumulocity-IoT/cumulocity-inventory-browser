@@ -224,22 +224,20 @@ describe('InventoryNavigationService', () => {
     expect(await service.findByExternalId('c8y_Serial', 'missing')).toEqual([]);
   });
 
-  it('revealIds() reflects the full ancestor chain carried on the withParents: true response', async () => {
-    // A real `withParents: true` response embeds every ancestor directly on the object, not just
-    // the immediate parent — revealIds() reads that straight off currentObject(), no extra fetches.
+  it('revealIds() keeps walking past a single withParents response until no hop turns up anything new', async () => {
+    // leaf's own withParents response only lists 'device-1', not 'root' — a real tenant's response
+    // for a non-root object was confirmed to stop partway too, contrary to what the docs' "all
+    // ancestors from all levels above" phrasing suggests. device-1's own deviceParents -> 'root'
+    // (already set up in beforeEach) is only found by continuing to walk from there.
     inventory.objects.set(
       'leaf',
-      managedObject('leaf', {
-        deviceParents: {
-          references: [
-            { self: 'x', managedObject: { id: 'device-1' } },
-            { self: 'y', managedObject: { id: 'root' } },
-          ],
-        },
-      })
+      managedObject('leaf', { deviceParents: { references: [{ self: 'x', managedObject: { id: 'device-1' } }] } })
     );
 
     await service.open('leaf');
+    // computeRevealIds() is fired-and-forgotten from load(), not awaited directly by open() — give
+    // its background walk a chance to reach past device-1 to root.
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(service.revealIds()).toEqual(new Set(['leaf', 'device-1', 'root']));
   });

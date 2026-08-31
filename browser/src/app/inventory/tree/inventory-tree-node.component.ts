@@ -1,4 +1,4 @@
-import { Component, Input, effect, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, Input, NgZone, effect, inject } from '@angular/core';
 import { IManagedObject } from '@c8y/client';
 import { IconDirective } from '@c8y/ngx-components';
 import { managedObjectIcon } from '../shared/managed-object-icon.util';
@@ -13,6 +13,8 @@ import { InventoryNavigationService } from '../state/inventory-navigation.servic
 })
 export class InventoryTreeNodeComponent {
   private readonly nav = inject(InventoryNavigationService);
+  private readonly ngZone = inject(NgZone);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   @Input({ required: true }) node!: IManagedObject;
 
@@ -38,10 +40,16 @@ export class InventoryTreeNodeComponent {
     // of this same effect, cascading down). The selection itself doesn't need this — it's already
     // rendered once its parent expands, and isActive highlights it — so it's excluded to avoid an
     // unnecessary extra childrenOf() fetch for a node the user isn't browsing into.
+    //
+    // Wrapped in ngZone.run(): Angular's effect() scheduler doesn't guarantee it flushes inside the
+    // Angular zone, so a state change made only from here (never from a real DOM event, unlike
+    // toggle()) could otherwise mutate `expanded`/`children` without ever triggering the change
+    // detection tick that would actually render it — observed in practice as the reveal expanding
+    // nothing even though the right ancestor id was resolved and matched.
     effect(() => {
       const ids = this.nav.revealIds();
       if (!this.expanded && ids.has(this.node.id) && this.node.id !== this.nav.currentObject()?.id) {
-        void this.expand();
+        this.ngZone.run(() => void this.expand());
       }
     });
   }
@@ -57,6 +65,7 @@ export class InventoryTreeNodeComponent {
 
   private async expand(): Promise<void> {
     this.expanded = true;
+    this.cdr.markForCheck();
     if (this.loaded) {
       return;
     }
@@ -67,6 +76,7 @@ export class InventoryTreeNodeComponent {
     } finally {
       this.loading = false;
       this.loaded = true;
+      this.cdr.markForCheck();
     }
   }
 
