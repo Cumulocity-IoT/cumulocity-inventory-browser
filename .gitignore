@@ -1,3 +1,5 @@
 browser/node_modules/.bin/lessc
 /attic/
+/.claude/
+/.vscode/
 .DS_Store
