@@ -1,6 +1,6 @@
 {
   "name": "cumulocity-inventory-browser",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Cumulocity application for browsing and managing inventory objects.",
   "scripts": {
     "ng": "ng",
