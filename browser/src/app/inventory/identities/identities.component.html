@@ -1,23 +1,34 @@
-<div class="identities">
-  <h3>Identities</h3>
-  @if (nav.identities().length) {
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>External ID</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (entry of nav.identities(); track entry.type + entry.externalId) {
-          <tr>
-            <td>{{ entry.type }}</td>
-            <td>{{ entry.externalId }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
+<ng-template #chipContent let-entry>
+  @if (copiedKey() === key(entry)) {
+    Copied
   } @else {
-    <p class="hint">No identities</p>
+    <b>{{ entry.type }}</b> {{ entry.externalId }}
   }
-</div>
+</ng-template>
+
+@for (entry of visible(); track key(entry)) {
+  <button
+    type="button"
+    class="chip"
+    [class.copied]="copiedKey() === key(entry)"
+    [title]="'Copy ' + entry.externalId + ' (' + entry.type + ')'"
+    (click)="copy(entry)"
+  >
+    <ng-container *ngTemplateOutlet="chipContent; context: { $implicit: entry }"></ng-container>
+  </button>
+}
+
+@if (overflow().length) {
+  <button type="button" class="chip more" [attr.aria-expanded]="popoverOpen()" (click)="togglePopover($event)">
+    +{{ overflow().length }} more
+  </button>
+  @if (popoverOpen()) {
+    <div class="popover" [style.top.px]="popoverPos().top" [style.left.px]="popoverPos().left">
+      @for (entry of overflow(); track key(entry)) {
+        <button type="button" class="chip" [class.copied]="copiedKey() === key(entry)" (click)="copy(entry)">
+          <ng-container *ngTemplateOutlet="chipContent; context: { $implicit: entry }"></ng-container>
+        </button>
+      }
+    </div>
+  }
+}

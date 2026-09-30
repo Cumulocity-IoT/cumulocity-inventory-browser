@@ -19,6 +19,9 @@
     Next <i c8yIcon="chevron-right"></i>
   </button>
 </c8y-action-bar-item>
+<c8y-action-bar-item placement="left" [priority]="5">
+  <app-identities></app-identities>
+</c8y-action-bar-item>
 <c8y-action-bar-item placement="right" [priority]="10">
   <button type="button" class="btn btn-link" title="Refresh" (click)="nav.refresh()">
     <i c8yIcon="refresh"></i> Refresh
@@ -27,24 +30,16 @@
 
 <div class="inventory-browser">
   <div class="resizable-region" #resizableRegion>
-    <app-inventory-search [heightPx]="searchHeightPx"></app-inventory-search>
+    <app-inventory-search [heightPx]="searchHeightPx" (collapsedChange)="searchCollapsed = $event"></app-inventory-search>
     <div
       class="divider"
-      [class.dragging]="resizing === 'search'"
-      (mousedown)="onDividerMouseDown($event, 'search')"
+      [hidden]="searchCollapsed"
+      [class.dragging]="resizing"
+      (mousedown)="onDividerMouseDown($event)"
       role="separator"
       aria-orientation="horizontal"
       aria-label="Resize search results / JSON view"
     ></div>
-    <app-managed-object-view [style.height.px]="topHeightPx"></app-managed-object-view>
-    <div
-      class="divider"
-      [class.dragging]="resizing === 'json'"
-      (mousedown)="onDividerMouseDown($event, 'json')"
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label="Resize JSON view / Identities"
-    ></div>
-    <app-identities></app-identities>
+    <app-managed-object-view></app-managed-object-view>
   </div>
 </div>
