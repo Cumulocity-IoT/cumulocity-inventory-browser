@@ -6,15 +6,10 @@ import { InventorySearchComponent } from './search/inventory-search.component';
 import { InventoryNavigationService } from './state/inventory-navigation.service';
 
 const SEARCH_STORAGE_KEY = 'inventory-browser.search-results-height-px';
-const TOP_STORAGE_KEY = 'inventory-browser.json-view-height-px';
 const DEFAULT_SEARCH_HEIGHT_PX = 220;
 const MIN_SEARCH_HEIGHT_PX = 140;
-const DEFAULT_TOP_HEIGHT_PX = 480;
-const MIN_TOP_HEIGHT_PX = 200;
 const MIN_BOTTOM_HEIGHT_PX = 120;
 const DIVIDER_HEIGHT_PX = 9;
-
-type ResizeTarget = 'search' | 'json';
 
 @Component({
   selector: 'app-inventory-browser',
@@ -36,11 +31,10 @@ export class InventoryBrowserComponent implements OnDestroy {
   @ViewChild('resizableRegion') private resizableRegion?: ElementRef<HTMLDivElement>;
 
   protected searchHeightPx = readStoredHeight(SEARCH_STORAGE_KEY, DEFAULT_SEARCH_HEIGHT_PX, MIN_SEARCH_HEIGHT_PX);
-  protected topHeightPx = readStoredHeight(TOP_STORAGE_KEY, DEFAULT_TOP_HEIGHT_PX, MIN_TOP_HEIGHT_PX);
-  protected resizing: ResizeTarget | null = null;
+  protected resizing = false;
+  protected searchCollapsed = false;
   private startY = 0;
   private startSearchHeight = 0;
-  private startTopHeight = 0;
   private readonly onMouseMove = (event: MouseEvent): void => this.handleMouseMove(event);
   private readonly onMouseUp = (): void => this.handleMouseUp();
 
@@ -53,12 +47,11 @@ export class InventoryBrowserComponent implements OnDestroy {
     return `Inventory View — ${name}`;
   }
 
-  onDividerMouseDown(event: MouseEvent, target: ResizeTarget): void {
+  onDividerMouseDown(event: MouseEvent): void {
     event.preventDefault();
-    this.resizing = target;
+    this.resizing = true;
     this.startY = event.clientY;
     this.startSearchHeight = this.searchHeightPx;
-    this.startTopHeight = this.topHeightPx;
     document.addEventListener('mousemove', this.onMouseMove);
     document.addEventListener('mouseup', this.onMouseUp);
   }
@@ -74,39 +67,23 @@ export class InventoryBrowserComponent implements OnDestroy {
     }
     const delta = event.clientY - this.startY;
     const regionHeight = this.resizableRegion?.nativeElement.getBoundingClientRect().height;
-    const dividersHeight = DIVIDER_HEIGHT_PX * 2;
-
-    if (this.resizing === 'search') {
-      let next = Math.max(MIN_SEARCH_HEIGHT_PX, this.startSearchHeight + delta);
-      if (regionHeight) {
-        const max = Math.max(MIN_SEARCH_HEIGHT_PX, regionHeight - dividersHeight - this.topHeightPx - MIN_BOTTOM_HEIGHT_PX);
-        next = Math.min(next, max);
-      }
-      this.searchHeightPx = next;
-    } else {
-      let next = Math.max(MIN_TOP_HEIGHT_PX, this.startTopHeight + delta);
-      if (regionHeight) {
-        const max = Math.max(MIN_TOP_HEIGHT_PX, regionHeight - dividersHeight - this.searchHeightPx - MIN_BOTTOM_HEIGHT_PX);
-        next = Math.min(next, max);
-      }
-      this.topHeightPx = next;
+    let next = Math.max(MIN_SEARCH_HEIGHT_PX, this.startSearchHeight + delta);
+    if (regionHeight) {
+      const max = Math.max(MIN_SEARCH_HEIGHT_PX, regionHeight - DIVIDER_HEIGHT_PX - MIN_BOTTOM_HEIGHT_PX);
+      next = Math.min(next, max);
     }
+    this.searchHeightPx = next;
   }
 
   private handleMouseUp(): void {
     if (!this.resizing) {
       return;
     }
-    const resized = this.resizing;
-    this.resizing = null;
+    this.resizing = false;
     document.removeEventListener('mousemove', this.onMouseMove);
     document.removeEventListener('mouseup', this.onMouseUp);
     try {
-      if (resized === 'search') {
-        localStorage.setItem(SEARCH_STORAGE_KEY, String(this.searchHeightPx));
-      } else {
-        localStorage.setItem(TOP_STORAGE_KEY, String(this.topHeightPx));
-      }
+      localStorage.setItem(SEARCH_STORAGE_KEY, String(this.searchHeightPx));
     } catch {
       // Private browsing / storage disabled — the resized height just won't persist.
     }

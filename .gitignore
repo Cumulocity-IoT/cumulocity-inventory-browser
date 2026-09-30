@@ -3,3 +3,4 @@ browser/node_modules/.bin/lessc
 /.claude/
 /.vscode/
 .DS_Store
+browser/src/dist/

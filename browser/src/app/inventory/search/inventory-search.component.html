@@ -1,4 +1,4 @@
-<div class="inventory-search" [style.height.px]="heightPx">
+<div class="inventory-search" [class.collapsed]="collapsed()" [style.height.px]="collapsed() ? null : heightPx">
   <div class="search-fieldsets">
     <fieldset class="search-fieldset">
       <legend>Match name, id, type, or fragment</legend>
@@ -57,7 +57,14 @@
     </fieldset>
   </div>
 
-  @if (anySearchActive) {
+  @if (anySearchActive && collapsed()) {
+    <button type="button" class="results-summary" (click)="expand()" title="Show search results">
+      <i c8yIcon="angle-down"></i>
+      {{ mergedResults().length }} {{ mergedResults().length === 1 ? 'match' : 'matches' }}{{ hasMore ? '+' : '' }}
+    </button>
+  }
+
+  @if (anySearchActive && !collapsed()) {
     <div class="search-results">
       <c8y-data-grid
         class="results-grid"

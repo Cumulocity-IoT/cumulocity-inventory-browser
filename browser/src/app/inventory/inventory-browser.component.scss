@@ -20,7 +20,7 @@ app-inventory-search {
 
 app-managed-object-view {
   display: block;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -45,11 +45,4 @@ app-managed-object-view {
 .divider:hover::before,
 .divider.dragging::before {
   background: var(--c8y-color-primary, #1776bf);
-}
-
-app-identities {
-  display: block;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
 }

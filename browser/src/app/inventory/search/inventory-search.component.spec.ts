@@ -16,16 +16,16 @@ function createComponent(nav: any = { refreshRequested: () => 0 }) {
   return TestBed.createComponent(InventorySearchComponent).componentInstance;
 }
 
-describe('InventorySearchComponent — devices/groups filter (always on)', () => {
-  it('hides non-device/group results', () => {
+describe('InventorySearchComponent — no device/group filtering', () => {
+  it('shows custom-typed objects without c8y_IsDevice/c8y_IsDeviceGroup (e.g. ec_PlantConfiguration)', () => {
     const device = { id: 'device-1', name: 'Device 1', c8y_IsDevice: {} } as any;
-    const plainAsset = { id: 'plain-1', name: 'Plain asset' } as any;
+    const plainAsset = { id: 'plain-1', name: 'Plain asset', type: 'ec_PlantConfiguration' } as any;
 
     const component = createComponent();
     component.searchTerm = 'x';
     component.results.set([device, plainAsset]);
 
-    expect(component.mergedResults().map((r) => r.object.id)).toEqual(['device-1']);
+    expect(component.mergedResults().map((r) => r.object.id)).toEqual(['device-1', 'plain-1']);
   });
 });
 
@@ -166,5 +166,22 @@ describe('InventorySearchComponent — external ID search', () => {
     expect(lastArgs).toEqual(['c8y_Serial', '12345']);
     expect(component.externalIdResults()).toEqual([found]);
     expect(component.mergedResults()[0].matchReasons).toEqual(['external id']);
+  });
+});
+
+describe('InventorySearchComponent — collapsing', () => {
+  it('collapses when a result is selected and expands on new input', () => {
+    const nav = { refreshRequested: () => 0, open: vi.fn() };
+    const component = createComponent(nav);
+    const emitted: boolean[] = [];
+    component.collapsedChange.subscribe((v) => emitted.push(v));
+
+    component.select('device-1');
+    expect(component.collapsed()).toBe(true);
+    expect(nav.open).toHaveBeenCalledWith('device-1');
+
+    component.onSearchInput();
+    expect(component.collapsed()).toBe(false);
+    expect(emitted).toEqual([true, false]);
   });
 });

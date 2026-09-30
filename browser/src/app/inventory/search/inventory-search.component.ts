@@ -1,4 +1,4 @@
-import { Component, Input, computed, effect, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IManagedObject, IResultList } from '@c8y/client';
 import {
@@ -11,7 +11,6 @@ import {
   IconDirective,
   Pagination,
 } from '@c8y/ngx-components';
-import { isDeviceOrGroup } from '../shared/managed-object-filter.util';
 import { managedObjectIcon } from '../shared/managed-object-icon.util';
 import { hasNextPage } from '../shared/paging.util';
 import { InventoryNavigationService } from '../state/inventory-navigation.service';
@@ -30,17 +29,25 @@ export class InventorySearchComponent {
   /** Total height of this component (search fields + results list), set by InventoryBrowserComponent's divider. Null = auto height (e.g. in tests). */
   @Input() heightPx: number | null = null;
 
+  /** Emits when the results list collapses to / expands from its one-line summary, so the parent can hide its resize divider. */
+  @Output() readonly collapsedChange = new EventEmitter<boolean>();
+
+  /** True once a result was picked: the list shrinks to a "N matches" chip until the user searches again or expands it. */
+  readonly collapsed = signal(false);
+
   protected readonly displayOptions = {
     striped: true,
     bordered: false,
-    gridHeader: false,
-    filter: false,
+    gridHeader: true,
+    filter: true,
     hover: true,
     footer: false,
   };
 
   protected readonly columns: Column[] = [
-    { name: 'name', header: 'Name', path: 'object.name', sortable: false, filterable: false, gridTrackSize: '1fr' },
+    { name: 'name', header: 'Name', path: 'object.name', sortable: true, filterable: true, gridTrackSize: '1fr' },
+    { name: 'type', header: 'Type', path: 'object.type', sortable: true, filterable: true, gridTrackSize: '1fr' },
+    { name: 'id', header: 'ID', path: 'object.id', sortable: true, filterable: true, gridTrackSize: '140px' },
     { name: 'matches', header: 'Matched by', path: 'matchReasons', sortable: false, filterable: false, gridTrackSize: '160px' },
   ];
 
@@ -79,14 +86,15 @@ export class InventorySearchComponent {
    * changed" and re-renders/reloads — visible as constant flicker. `computed()` only recomputes
    * (and only produces a new reference) when one of the signals it reads actually changes.
    *
-   * All three underlying result sets are filtered to devices/groups only, same as the tree —
-   * plain assets (e.g. dashboards) aren't useful entry points here.
+   * Results are deliberately NOT filtered to devices/groups (unlike the tree): an explicit search
+   * must surface whatever matched, e.g. custom-typed objects like `ec_PlantConfiguration` that
+   * carry neither `c8y_IsDevice` nor `c8y_IsDeviceGroup`.
    */
   readonly mergedResults = computed(() => {
     const sources: MatchSource[] = [
-      { reason: 'name/id/type', items: this.results().filter(isDeviceOrGroup) },
-      { reason: 'fragment', items: this.fragmentResults().filter(isDeviceOrGroup) },
-      { reason: 'external id', items: this.externalIdResults().filter(isDeviceOrGroup) },
+      { reason: 'name/id/type', items: this.results() },
+      { reason: 'fragment', items: this.fragmentResults() },
+      { reason: 'external id', items: this.externalIdResults() },
     ];
     return mergeSearchResults(sources);
   });
@@ -125,6 +133,7 @@ export class InventorySearchComponent {
   }
 
   private clearSearches(): void {
+    this.setCollapsed(false);
     this.searchTerm = '';
     this.results.set([]);
     this.resultsPage = null;
@@ -137,16 +146,19 @@ export class InventorySearchComponent {
   }
 
   onSearchInput(): void {
+    this.setCollapsed(false);
     clearTimeout(this.searchDebounce);
     this.searchDebounce = setTimeout(() => void this.runSearch(), InventorySearchComponent.SEARCH_DEBOUNCE_MS);
   }
 
   onFragmentInput(): void {
+    this.setCollapsed(false);
     clearTimeout(this.fragmentDebounce);
     this.fragmentDebounce = setTimeout(() => void this.runFragmentSearch(), InventorySearchComponent.SEARCH_DEBOUNCE_MS);
   }
 
   onExternalIdInput(): void {
+    this.setCollapsed(false);
     clearTimeout(this.externalIdDebounce);
     this.externalIdDebounce = setTimeout(() => void this.runExternalIdSearch(), InventorySearchComponent.SEARCH_DEBOUNCE_MS);
   }
@@ -156,7 +168,17 @@ export class InventorySearchComponent {
   }
 
   select(id: string): void {
+    this.setCollapsed(true);
     void this.nav.open(id);
+  }
+
+  expand(): void {
+    this.setCollapsed(false);
+  }
+
+  private setCollapsed(value: boolean): void {
+    this.collapsed.set(value);
+    this.collapsedChange.emit(value);
   }
 
   cellIcon(context: CellRendererContext): string {

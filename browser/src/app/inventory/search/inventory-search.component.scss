@@ -13,12 +13,19 @@
 .search-fieldsets {
   flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.6rem;
 }
 
+// Only stack the two fieldsets on narrow screens; otherwise all four inputs share one line.
+@media (max-width: 900px) {
+  .search-fieldsets {
+    flex-wrap: wrap;
+  }
+}
+
 .search-fieldset {
-  flex: 1 1 220px;
+  flex: 1 1 0;
   min-width: 200px;
   margin: 0;
   padding: 0.3rem 0.6rem 0.4rem;
@@ -137,4 +144,20 @@
 .load-more:disabled {
   cursor: default;
   opacity: 0.6;
+}
+
+.results-summary {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 0.4rem;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.results-summary:hover {
+  background: #f5f5f5;
 }
