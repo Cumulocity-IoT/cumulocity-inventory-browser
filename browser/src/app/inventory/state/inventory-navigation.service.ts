@@ -165,14 +165,22 @@ export class InventoryNavigationService {
       return [];
     }
     try {
-      const { data } = await this.identity.detail({ type: type.trim(), externalId: externalId.trim() });
+      const { data } = await this.identity.detail({
+        // The SDK interpolates these into the URL path unescaped, so spaces, '/', '#', '?' etc. would break the lookup.
+        type: encodeURIComponent(type.trim()),
+        externalId: encodeURIComponent(externalId.trim()),
+      });
       const id = data.managedObject?.id;
       if (!id) {
         return [];
       }
       const { data: managedObject } = await this.inventory.detail(id, { withChildren: false });
       return [managedObject];
-    } catch {
+    } catch (error) {
+      // 404 = no such external ID (expected); anything else (403, network, …) must not look like "no match".
+      if ((error as { res?: Response })?.res?.status !== 404) {
+        console.error('External ID lookup failed', error);
+      }
       return [];
     }
   }
